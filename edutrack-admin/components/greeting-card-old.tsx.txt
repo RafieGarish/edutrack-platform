@@ -1,0 +1,121 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Cloud, CloudRain, Sun } from "lucide-react";
+import FlipClock from "@/components/flipclock";
+import { cn } from "@/lib/utils";
+
+interface GreetingProps {
+  userName?: string;
+  userRole?: string;
+  schoolName?: string;
+}
+
+function Clock() {
+  const [time, setTime] = useState(new Date());
+  useEffect(() => {
+    const interval = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const h = time.getHours();
+  const m = String(time.getMinutes()).padStart(2, "0");
+  const s = String(time.getSeconds()).padStart(2, "0");
+  const ampm = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 || 12;
+
+  return (
+    <div className="flex items-end gap-1">
+      <span className="text-4xl md:text-5xl font-display font-bold text-foreground tracking-tight tabular-nums" suppressHydrationWarning>
+        {String(h12).padStart(2, "0")}:{m}:{s}
+      </span>
+      <span className="text-lg font-semibold text-muted-foreground mb-1">{ampm}</span>
+    </div>
+  );
+}
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Selamat Pagi";
+  if (h < 15) return "Selamat Siang";
+  if (h < 18) return "Selamat Sore";
+  return "Selamat Malam";
+}
+
+export function GreetingCard({ userName, userRole, schoolName }: GreetingProps) {
+  const today = new Date().toLocaleDateString("id-ID", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  return (
+    // <div className="relative overflow-hidden rounded-xl bg-card border border-border/50 p-5 md:p-6">
+    //   {/* Decorative gradient */}
+    //   <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-blue-500/5 pointer-events-none" />
+    //   <div className="absolute -top-12 -right-12 w-40 h-40 bg-primary/5 rounded-full blur-2xl pointer-events-none" />
+
+    //   <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+    //     <div className="space-y-2">
+    //       <div>
+    //         <h1 className="text-white text-3xl font-medium flex items-center gap-1.5">
+    //           {getGreeting()}, Demo
+    //           <span>🚀</span>
+    //         </h1>
+    //         <p className="text-xs text-muted-foreground/60 mt-0.5">
+    //           Ready to make today productive!
+    //         </p>
+    //       </div>
+    //       <Clock />
+    //       <p className="text-xs text-muted-foreground/70 font-mono">{today}</p>
+    //     </div>
+
+    //     {/* Weather */}
+    //     <div className="flex items-center gap-4 bg-background/40 rounded-xl px-4 py-3 border border-border/30 backdrop-blur-sm shrink-0">
+    //       <div className="relative">
+    //         <Sun className="w-10 h-10 text-yellow-400" />
+    //         <Cloud className="w-6 h-6 text-blue-300 absolute -bottom-1 -right-1" />
+    //       </div>
+    //       <div>
+    //         <p className="text-3xl font-display font-bold text-foreground">34°C</p>
+    //         <p className="text-xs text-muted-foreground">Patchy rain nearby</p>
+    //         <p className="text-xs text-muted-foreground/70">Malang</p>
+    //         <p className="text-xs text-muted-foreground/50 font-mono mt-0.5">
+    //           Friday, February 27, 2026
+    //         </p>
+    //       </div>
+    //     </div>
+    //   </div>
+    // </div>
+    <div className="bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 relative overflow-hidden">
+      <div className="relative z-10 flex flex-col md:flex-row justify-between gap-6">
+        <div>
+          <h2 className="text-2xl font-bold mb-1 text-zinc-900 dark:text-zinc-50">{getGreeting()}, {userName}</h2>
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm mb-6">Ready to make today productive! 🚀</p>
+          <div className="flex items-baseline gap-2 text-zinc-900 dark:text-zinc-50">
+            <div>
+              {/* <span className="text-5xl font-bold tracking-tighter"><DigitalClock /></span> */}
+              <span className="tracking-tighter"><FlipClock /></span>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col items-end justify-between">
+          <div className="flex items-center gap-4">
+            <CloudRain className="w-12 h-12 text-blue-500 dark:text-blue-400" />
+            <div className="text-right">
+              <div className="text-4xl font-bold text-zinc-900 dark:text-zinc-50">34°C</div>
+              <div className="text-sm text-zinc-500 dark:text-zinc-400">Patchy rain nearby</div>
+            </div>
+          </div>
+          <div className="text-right mt-4 md:mt-0">
+            <div className="font-medium text-zinc-900 dark:text-zinc-50">
+              {schoolName || "-"}
+            </div>
+            <div className="text-sm text-zinc-500 dark:text-zinc-400">{today}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 16% 7%;
+    --foreground: 213 31% 91%;
+    --card: 220 14% 10%;
+    --card-foreground: 213 31% 91%;
+    --popover: 220 14% 10%;
+    --popover-foreground: 213 31% 91%;
+    --primary: 152 76% 45%;
+    --primary-foreground: 220 16% 7%;
+    --secondary: 220 14% 14%;
+    --secondary-foreground: 213 31% 91%;
+    --muted: 220 14% 14%;
+    --muted-foreground: 215 20% 50%;
+    --accent: 152 76% 45%;
+    --accent-foreground: 220 16% 7%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 213 31% 91%;
+    --border: 220 14% 16%;
+    --input: 220 14% 16%;
+    --ring: 152 76% 45%;
+    --radius: 0.75rem;
+    --chart-1: 152 76% 45%;
+    --chart-2: 196 80% 55%;
+    --chart-3: 262 70% 65%;
+    --chart-4: 43 90% 60%;
+    --chart-5: 0 84% 60%;
+    --sidebar-background: 220 16% 8%;
+    --sidebar-foreground: 213 31% 91%;
+    --sidebar-primary: 152 76% 45%;
+    --sidebar-primary-foreground: 220 16% 7%;
+    --sidebar-accent: 220 14% 14%;
+    --sidebar-accent-foreground: 213 31% 91%;
+    --sidebar-border: 220 14% 14%;
+    --sidebar-ring: 152 76% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-outfit), 'Outfit', sans-serif;
+  }
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .glow-green {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+  }
+  .text-gradient-green {
+    background: linear-gradient(135deg, #34d399, #10b981);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Attendance QR Scanner",
+  "description": "Scan student QR codes to log attendance instantly.",
+  "requestFramePermissions": ["camera"]
+}

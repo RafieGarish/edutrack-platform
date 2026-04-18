@@ -1,0 +1,409 @@
+import 'package:flutter/material.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+import '../core/theme.dart';
+
+// --- Data Model ---
+class AttendanceData {
+  final String week;
+  final double percentage;
+
+  AttendanceData(this.week, this.percentage);
+}
+
+class AnalyticsScreen extends StatefulWidget {
+  const AnalyticsScreen({super.key});
+
+  @override
+  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
+}
+
+class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  // Chart Data
+  final List<AttendanceData> _chartData = [
+    AttendanceData('WEEK 1', 60),
+    AttendanceData('WEEK 2', 100),
+    AttendanceData('WEEK 3', 45),
+    AttendanceData('WEEK 4', 75),
+  ];
+
+  late TooltipBehavior _tooltipBehavior;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Inisialisasi tooltip di sini agar bisa mengambil warna dari Theme (context)
+    final palette = AppPalette.of(context);
+    _tooltipBehavior = TooltipBehavior(
+      enable: true,
+      header: '',
+      canShowMarker: false,
+      format: 'point.y%',
+      color: palette.card, // Warna tooltip mengikuti tema kartu
+      textStyle: TextStyle(color: palette.text), // Warna teks tooltip
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context); // Ambil palet warna saat ini
+
+    return Scaffold(
+      backgroundColor: palette.background,
+      appBar: AppBar(
+        backgroundColor: palette.background.withOpacity(0.95),
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: palette.text),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text("Analytics",
+            style: TextStyle(fontWeight: FontWeight.bold, color: palette.text)),
+        centerTitle: true,
+        bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(color: palette.textGray.withOpacity(0.1), height: 1)),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Period Selector
+            Container(
+              height: 48,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: palette.card,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  _buildSegment("This Month", true, palette),
+                  _buildSegment("Last 3 Months", false, palette),
+                  _buildSegment("Semester", false, palette),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            Text("Attendance Trends",
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: palette.text)),
+            Text("Overview for September",
+                style: TextStyle(color: palette.textGray, fontSize: 14)),
+            const SizedBox(height: 16),
+
+            // Chart Card
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: palette.card,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: palette.textGray.withOpacity(0.1)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // Chart Header Stats
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("AVERAGE PRESENCE",
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: palette.textGray,
+                                  letterSpacing: 1)),
+                          const SizedBox(height: 4),
+                          Text("85%",
+                              style: TextStyle(
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.bold,
+                                  color: palette.text)),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                            color: palette.success.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(6)),
+                        child: Row(children: [
+                          Icon(Icons.trending_up,
+                              color: palette.success, size: 16),
+                          const SizedBox(width: 4),
+                          Text("+5%",
+                              style: TextStyle(
+                                  color: palette.success,
+                                  fontWeight: FontWeight.bold))
+                        ]),
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // --- SYNCFUSION CHART IMPLEMENTATION ---
+                  SizedBox(
+                    height: 200,
+                    child: SfCartesianChart(
+                      plotAreaBorderWidth: 0,
+                      tooltipBehavior: _tooltipBehavior,
+                      // X Axis Configuration
+                      primaryXAxis: CategoryAxis(
+                        majorGridLines: const MajorGridLines(width: 0),
+                        axisLine: const AxisLine(width: 0),
+                        majorTickLines: const MajorTickLines(size: 0),
+                        labelStyle: TextStyle(
+                            color: palette.textGray,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      // Y Axis Configuration (Hidden)
+                      primaryYAxis: NumericAxis(
+                        isVisible: false,
+                        minimum: 0,
+                        maximum: 100,
+                      ),
+                      // Series
+                      series: <CartesianSeries>[
+                        ColumnSeries<AttendanceData, String>(
+                          dataSource: _chartData,
+                          xValueMapper: (AttendanceData data, _) => data.week,
+                          yValueMapper: (AttendanceData data, _) =>
+                              data.percentage,
+                          color: palette.primary,
+                          width: 0.5,
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(8)),
+                          isTrackVisible: true,
+                          trackColor: palette.primary.withOpacity(0.15),
+                          trackBorderColor: Colors.transparent,
+                          animationDuration: 1500,
+                        )
+                      ],
+                    ),
+                  )
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Insight Banner
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [
+                  palette.primary.withOpacity(0.1),
+                  palette.background.withOpacity(0.1) // Fade to bg
+                ]),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: palette.primary.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                          color: palette.primary.withOpacity(0.2),
+                          shape: BoxShape.circle),
+                      child: Icon(Icons.insights,
+                          color: palette.primary, size: 20)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Great job!",
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: palette.text)),
+                        Text(
+                            "Your attendance has improved significantly compared to last month.",
+                            style: TextStyle(
+                                fontSize: 12, color: palette.textGray)),
+                      ],
+                    ),
+                  )
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+            Text("Summary",
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: palette.text)),
+            const SizedBox(height: 16),
+
+            // Stats Grid
+            Row(
+              children: [
+                _buildStatCard("Present", Icons.check_circle, "18", "+2%",
+                    palette.success, palette),
+                const SizedBox(width: 12),
+                _buildStatCard(
+                    "Absent", Icons.cancel, "2", "0%", palette.error, palette),
+                const SizedBox(width: 12),
+                _buildStatCard(
+                    "Late", Icons.schedule, "1", "-1%", palette.warning, palette),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+            Text("Recent Check-ins",
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: palette.text)),
+            const SizedBox(height: 12),
+
+            _buildRecentItem("Mathematics 101", "Today, 09:00 AM", "On Time",
+                palette.success, palette),
+            const SizedBox(height: 12),
+            _buildRecentItem("History of Art", "Yesterday, 02:15 PM", "Late",
+                palette.warning, palette),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSegment(String text, bool isActive, AppPalette palette) {
+    return Expanded(
+      child: Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isActive
+              ? palette.background.withOpacity(0.5) // Sedikit kontras dari card
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: isActive
+              ? [const BoxShadow(color: Colors.black12, blurRadius: 2)]
+              : null,
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isActive ? palette.primary : palette.textGray,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String label, IconData icon, String value,
+      String percent, Color color, AppPalette palette) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: palette.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: palette.textGray.withOpacity(0.1)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 5,
+            )
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: palette.textGray)),
+                Icon(icon, size: 16, color: color),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: palette.text)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4)),
+              child: Text(percent,
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: color)),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentItem(String title, String time, String status, Color color,
+      AppPalette palette) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: palette.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.textGray.withOpacity(0.1)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: palette.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8)),
+            child: Icon(Icons.qr_code_scanner,
+                color: palette.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, color: palette.text)),
+                Text(time,
+                    style: TextStyle(fontSize: 12, color: palette.textGray)),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6)),
+            child: Text(status,
+                style: TextStyle(
+                    fontSize: 10, fontWeight: FontWeight.bold, color: color)),
+          )
+        ],
+      ),
+    );
+  }
+}

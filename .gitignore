@@ -1,0 +1,69 @@
+# Miscellaneous
+aplikasi_siswa/*.class
+aplikasi_siswa/*.log
+aplikasi_siswa/*.pyc
+aplikasi_siswa/*.swp
+aplikasi_siswa/.DS_Store
+aplikasi_siswa/.atom/
+aplikasi_siswa/.build/
+aplikasi_siswa/.buildlog/
+aplikasi_siswa/.history
+aplikasi_siswa/.svn/
+aplikasi_siswa/.swiftpm/
+aplikasi_siswa/migrate_working_dir/
+
+# IntelliJ related
+aplikasi_siswa/*.iml
+aplikasi_siswa/*.ipr
+aplikasi_siswa/*.iws
+aplikasi_siswa/.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+aplikasi_siswa/**/doc/api/
+aplikasi_siswa/**/ios/Flutter/.last_build_id
+aplikasi_siswa/.dart_tool/
+aplikasi_siswa/.flutter-plugins-dependencies
+aplikasi_siswa/.pub-cache/
+aplikasi_siswa/.pub/
+aplikasi_siswa/build/
+aplikasi_siswa/coverage/
+
+# Symbolication related
+aplikasi_siswa/app.*.symbols
+
+# Obfuscation related
+aplikasi_siswa/app.*.map.json
+
+# Android Studio will place build artifacts here
+aplikasi_siswa/android/app/debug
+aplikasi_siswa/android/app/profile
+aplikasi_siswa/android/app/release
+
+qr-scanner/node_modules/
+qr-scanner/.next/
+qr-scanner/coverage/
+qr-scanner/.DS_Store
+qr-scanner/*.log
+qr-scanner/.env*
+qr-scanner/!.env.example
+
+edutrack-admin/node_modules/
+edutrack-admin/.next/
+edutrack-admin/coverage/
+edutrack-admin/.DS_Store
+edutrack-admin/*.log
+edutrack-admin/.env*
+edutrack-admin/!.env.example
+
+landing-page-edutrack/node_modules/
+landing-page-edutrack/.next/
+landing-page-edutrack/coverage/
+landing-page-edutrack/.DS_Store
+landing-page-edutrack/*.log
+landing-page-edutrack/.env*
+landing-page-edutrack/!.env.example

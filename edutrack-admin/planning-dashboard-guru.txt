@@ -1,0 +1,1 @@
+guru hanya boleh mengakses jadwal kelas yang diajar dan melihat absensi siswa

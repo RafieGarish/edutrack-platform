@@ -1,0 +1,3308 @@
+import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'dart:async';
+import 'package:google_fonts/google_fonts.dart';
+
+import 'analytics_screen.dart';
+
+// --- 1. Theme Extension & Color Palette ---
+// Kelas ini menggantikan AppColors statis agar bisa dinamis (Dark/Light)
+@immutable
+class AppPalette extends ThemeExtension<AppPalette> {
+  final Color primary;
+  final Color background;
+  final Color card;
+  final Color text;
+  final Color textGray;
+  final Color success;
+  final Color warning;
+  final Color error;
+
+  const AppPalette({
+    required this.primary,
+    required this.background,
+    required this.card,
+    required this.text,
+    required this.textGray,
+    required this.success,
+    required this.warning,
+    required this.error,
+  });
+
+  // Helper untuk akses cepat: AppPalette.of(context).primary
+  static AppPalette of(BuildContext context) {
+    return Theme.of(context).extension<AppPalette>()!;
+  }
+
+  // Definisi Warna Mode Gelap (Original)
+  static const dark = AppPalette(
+    primary: Color(0xFF13b6ec),
+    background: Color(0xFF101d22),
+    card: Color(0xFF1a2c32),
+    text: Colors.white,
+    textGray: Color(0xFF9db2b9),
+    success: Color(0xFF22c55e),
+    warning: Color(0xFFf59e0b),
+    error: Color(0xFFef4444),
+  );
+
+  // Definisi Warna Mode Terang (Baru)
+  static const light = AppPalette(
+    primary: Color(0xFF0E8AB3), // Teal sedikit lebih gelap agar kontras di putih
+    background: Color(0xFFF3F4F6), // Abu-abu sangat muda
+    card: Color(0xFFFFFFFF), // Putih bersih
+    text: Color(0xFF111827), // Hampir hitam
+    textGray: Color(0xFF6B7280), // Abu-abu medium
+    success: Color(0xFF16A34A),
+    warning: Color(0xFFD97706),
+    error: Color(0xFFDC2626),
+  );
+
+  @override
+  ThemeExtension<AppPalette> copyWith({
+    Color? primary,
+    Color? background,
+    Color? card,
+    Color? text,
+    Color? textGray,
+    Color? success,
+    Color? warning,
+    Color? error,
+  }) {
+    return AppPalette(
+      primary: primary ?? this.primary,
+      background: background ?? this.background,
+      card: card ?? this.card,
+      text: text ?? this.text,
+      textGray: textGray ?? this.textGray,
+      success: success ?? this.success,
+      warning: warning ?? this.warning,
+      error: error ?? this.error,
+    );
+  }
+
+  @override
+  ThemeExtension<AppPalette> lerp(ThemeExtension<AppPalette>? other, double t) {
+    if (other is! AppPalette) return this;
+    return AppPalette(
+      primary: Color.lerp(primary, other.primary, t)!,
+      background: Color.lerp(background, other.background, t)!,
+      card: Color.lerp(card, other.card, t)!,
+      text: Color.lerp(text, other.text, t)!,
+      textGray: Color.lerp(textGray, other.textGray, t)!,
+      success: Color.lerp(success, other.success, t)!,
+      warning: Color.lerp(warning, other.warning, t)!,
+      error: Color.lerp(error, other.error, t)!,
+    );
+  }
+}
+
+// Global Notifier untuk Tema
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
+
+void main() {
+  runApp(const StudentApp());
+}
+
+class StudentApp extends StatelessWidget {
+  const StudentApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (context, currentMode, child) {
+        return MaterialApp(
+          title: 'Student Dashboard',
+          debugShowCheckedModeBanner: false,
+          themeMode: currentMode,
+          
+          // --- Light Theme Config ---
+          theme: ThemeData(
+            brightness: Brightness.light,
+            scaffoldBackgroundColor: AppPalette.light.background,
+            primaryColor: AppPalette.light.primary,
+            fontFamily: GoogleFonts.lexend().fontFamily,
+            extensions: const [AppPalette.light],
+            colorScheme: ColorScheme.light(
+              primary: AppPalette.light.primary,
+              surface: AppPalette.light.card,
+              background: AppPalette.light.background,
+            ),
+            useMaterial3: true,
+            appBarTheme: AppBarTheme(
+              backgroundColor: AppPalette.light.background,
+              foregroundColor: AppPalette.light.text,
+            ),
+          ),
+
+          // --- Dark Theme Config ---
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            scaffoldBackgroundColor: AppPalette.dark.background,
+            primaryColor: AppPalette.dark.primary,
+            fontFamily: GoogleFonts.lexend().fontFamily,
+            extensions: const [AppPalette.dark],
+            colorScheme: ColorScheme.dark(
+              primary: AppPalette.dark.primary,
+              surface: AppPalette.dark.card,
+              background: AppPalette.dark.background,
+            ),
+            useMaterial3: true,
+            appBarTheme: AppBarTheme(
+              backgroundColor: AppPalette.dark.background,
+              foregroundColor: AppPalette.dark.text,
+            ),
+          ),
+          
+          home: const SafeArea(child: LoginScreen()),
+        );
+      },
+    );
+  }
+}
+
+// --- 2. Custom Bottom Navigation Bar ---
+class CustomBottomNavBar extends StatelessWidget {
+  final int selectedIndex;
+  final Function(int) onItemSelected;
+  final VoidCallback onScanPressed;
+
+  const CustomBottomNavBar({
+    super.key,
+    required this.selectedIndex,
+    required this.onItemSelected,
+    required this.onScanPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    final bgColor = palette.card;
+    final borderColor = isDark ? const Color(0xFF283539) : const Color(0xFFE5E7EB);
+    final primaryColor = palette.primary;
+    final inactiveColor = palette.textGray;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(top: BorderSide(color: borderColor, width: 1)),
+      ),
+      child: SafeArea(
+        child: SizedBox(
+          height: 64,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(0, Icons.home_outlined, "Home", inactiveColor, primaryColor),
+                  _buildNavItem(1, Icons.history, "History", inactiveColor, primaryColor),
+                  const SizedBox(width: 56),
+                  _buildNavItem(2, Icons.calendar_today, "Schedule", inactiveColor, primaryColor),
+                  _buildNavItem(3, Icons.person_outline, "Profile", inactiveColor, primaryColor),
+                ],
+              ),
+              Positioned(
+                top: -20,
+                child: GestureDetector(
+                  onTap: onScanPressed,
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: primaryColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: primaryColor.withOpacity(0.4),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.qr_code_scanner,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(
+    int index,
+    IconData icon,
+    String label,
+    Color inactiveColor,
+    Color activeColor,
+  ) {
+    final isSelected = selectedIndex == index;
+    final color = isSelected ? activeColor : inactiveColor;
+    return Expanded(
+      child: InkWell(
+        onTap: () => onItemSelected(index),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 26),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- 3. Main Layout Shell ---
+class MainLayout extends StatefulWidget {
+  const MainLayout({super.key});
+
+  @override
+  State<MainLayout> createState() => _MainLayoutState();
+}
+
+class _MainLayoutState extends State<MainLayout> {
+  int _currentIndex = 0;
+  late PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _currentIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  final List<Widget> _pages = [
+    const HomeScreen(),
+    const HistoryScreen(), // Re-enabled History
+    // const AnalyticsScreen(), // Analytics is accessed via button usually, or tab. Assuming tab 2 is Schedule in nav bar logic above, but let's follow nav bar icons.
+    // Nav bar: Home, History, Schedule, Profile. 
+    // Analytics is usually a sub-screen or separate. Let's stick to Nav Bar structure.
+    const ScheduleScreen(),
+    const ProfileScreen(),
+  ];
+
+  void _onTabTapped(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: PageView(
+        controller: _pageController,
+        physics: const BouncingScrollPhysics(),
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        children: _pages,
+      ),
+      bottomNavigationBar: CustomBottomNavBar(
+        selectedIndex: _currentIndex,
+        onItemSelected: _onTabTapped,
+        onScanPressed: () {
+          Navigator.push(
+            context,
+            ScalePageRoute(page: const GenerateQRScreen()),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// --- 4. Home Screen ---
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Scaffold(
+      backgroundColor: palette.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: palette.primary.withOpacity(0.2),
+                            width: 2,
+                          ),
+                          image: const DecorationImage(
+                            image: NetworkImage(
+                              'https://lh3.googleusercontent.com/aida-public/AB6AXuCpVsceZE2tdgStdx-jm-hOKgDsF2C2ZENKMVWv9ZFBQM-3hP46RhhcZZf6xtI8GxfsIgfHwDtMpA4XTBHM1OlW1-V6xrt61pP_7SWz9-HHjFCjSpFWHD8Baky0VzhyjqblZU6pllEc4bMP_S01ryW7dDhGPk1HXq37YM7SywJpEFGFWBXH0CjVp-AB_v09ozhdVs2w8xB8yR-swH43yWfHRzZMPzVt--LpWZ6KBKPt1psBgiwfZczZccRLLRIap9W6jy1N-TAasg',
+                            ),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Selamat Pagi,",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: palette.textGray,
+                            ),
+                          ),
+                          Text(
+                            "Alex Johnson",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: palette.text,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Stack(
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            SlidePageRoute(page: const NotificationScreen()),
+                          );
+                        },
+                        icon: Badge(
+                          label: const Text('5'),
+                          child: Icon(
+                            Icons.notifications_outlined,
+                            color: palette.text,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              // Hero Card
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    ScalePageRoute(page: const GenerateQRScreen()),
+                  );
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: palette.card,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: palette.primary.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: palette.primary.withOpacity(0.3),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: palette.primary.withOpacity(0.2),
+                              blurRadius: 15,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.qr_code_scanner,
+                          size: 32,
+                          color: palette.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        "Scan untuk Absen",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: palette.text,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Siap memulai pembelajaran? Scan QR code pada monitor untuk absensi",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: palette.textGray,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 24,
+                        ),
+                        decoration: BoxDecoration(
+                          color: palette.primary,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: palette.primary.withOpacity(0.25),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.center_focus_weak,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              "Buka Scanner",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Stats Row
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                         Navigator.push(context, SlidePageRoute(page: const AnalyticsScreen()));
+                      },
+                      child: _buildStatCard("Kehadiran", "85", "%", 0.85, true, palette),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildStatCard("Mapel", "12", "/ 14", 0, false, palette),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // Schedule Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Jadwal Hari Ini",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: palette.text),
+                  ),
+                  TextButton(
+                    onPressed: () {},
+                    child: Text(
+                      "Lihat Kalender",
+                      style: TextStyle(color: palette.primary, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Timeline
+              Stack(
+                children: [
+                  Positioned(
+                    left: 20,
+                    top: 0,
+                    bottom: 0,
+                    child: Container(width: 2, color: palette.textGray.withOpacity(0.2)),
+                  ),
+                  Column(
+                    children: [
+                      _buildTimelineItem(
+                        isPast: true,
+                        title: "Mathematics",
+                        time: "09:00 AM - 10:30 AM",
+                        location: "Room 302",
+                        status: "Attended",
+                        palette: palette,
+                      ),
+                      _buildTimelineItem(
+                        isPast: false,
+                        isCurrent: true,
+                        title: "Physics 101",
+                        time: "11:00 AM - 12:30 PM",
+                        location: "Science Lab 1",
+                        status: "Up Next",
+                        palette: palette,
+                      ),
+                      _buildTimelineItem(
+                        isPast: false,
+                        title: "World History",
+                        time: "02:00 PM - 03:30 PM",
+                        location: "Lecture Hall B",
+                        status: "",
+                        palette: palette,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 60),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(
+    String title,
+    String bigVal,
+    String smallVal,
+    double progress,
+    bool showChart,
+    AppPalette palette,
+  ) {
+    return Container(
+      height: 140,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: palette.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.textGray.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 5,
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: palette.textGray,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (showChart)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.trending_up, color: Colors.green, size: 14),
+                      Text(
+                        " 2%",
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    bigVal,
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: palette.text,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6, left: 2),
+                    child: Text(
+                      smallVal,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: palette.textGray,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (showChart)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: palette.textGray.withOpacity(0.2),
+                    color: palette.primary,
+                    minHeight: 6,
+                  ),
+                )
+              else
+                Text(
+                  "Completed this week",
+                  style: TextStyle(fontSize: 10, color: palette.textGray),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimelineItem({
+    required bool isPast,
+    bool isCurrent = false,
+    required String title,
+    required String time,
+    required String location,
+    required String status,
+    required AppPalette palette,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16, left: 5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Dot
+          Column(
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 16,
+                height: 16,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: isCurrent
+                      ? palette.primary
+                      : (isPast ? palette.textGray : palette.textGray),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: palette.background, width: 3),
+                  boxShadow: isCurrent
+                      ? [
+                          BoxShadow(
+                            color: palette.primary.withOpacity(0.5),
+                            blurRadius: 10,
+                          ),
+                        ]
+                      : null,
+                ),
+              ),
+            ],
+          ),
+          // Card
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isCurrent
+                    ? palette.card
+                    : (isPast
+                          ? palette.card.withOpacity(0.6)
+                          : palette.card),
+                borderRadius: BorderRadius.circular(12),
+                border: isCurrent
+                    ? Border(
+                        left: BorderSide(color: palette.primary, width: 4),
+                      )
+                    : Border.all(
+                        color: palette.textGray.withOpacity(0.1),
+                        width: 1,
+                      ),
+                boxShadow: isCurrent ? [
+                   BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)
+                ] : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isCurrent)
+                    Text(
+                      "UP NEXT",
+                      style: TextStyle(
+                        color: palette.primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: palette.text,
+                        ),
+                      ),
+                      if (isPast)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: palette.textGray.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            status,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: palette.textGray,
+                            ),
+                          ),
+                        ),
+                      if (isCurrent)
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: palette.textGray.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.science, size: 14, color: palette.text),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.schedule,
+                        size: 16,
+                        color: palette.textGray,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        time,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: palette.textGray,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 16,
+                        color: palette.textGray,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        location,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: palette.textGray,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- 5. Generate QR Screen ---
+class GenerateQRScreen extends StatefulWidget {
+  const GenerateQRScreen({super.key});
+
+  @override
+  State<GenerateQRScreen> createState() => _GenerateQRScreenState();
+}
+
+class _GenerateQRScreenState extends State<GenerateQRScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  double progress = 1.0;
+  Timer? timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+    timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      setState(() {
+        progress -= 0.1;
+        if (progress <= 0.0) {
+          progress = 1.0;
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Scaffold(
+      backgroundColor: palette.background,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: CircleAvatar(
+            backgroundColor: palette.card,
+            child: IconButton(
+              icon: Icon(Icons.arrow_back, color: palette.text),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+        ),
+        title: Text(
+          "Check-In",
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: palette.text),
+        ),
+        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  "Live",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: palette.textGray,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  Text(
+                    "XII RPL",
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: palette.text,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Gedung Timur",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: palette.textGray,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: palette.card,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: palette.textGray.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
+                          size: 14,
+                          color: palette.textGray,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          "Oct 24, 2023 • 09:00 AM",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: palette.textGray,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // QR Container
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Glow
+                      Container(
+                        width: 300,
+                        height: 300,
+                        decoration: BoxDecoration(
+                          color: palette.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(200),
+                          boxShadow: [
+                            BoxShadow(
+                              color: palette.primary.withOpacity(0.2),
+                              blurRadius: 40,
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Card
+                      Container(
+                        width: 280,
+                        height: 280,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.white, // QR Code background always white
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Stack(
+                          children: [
+                            const Center(
+                              child: Text("Generated QR Code", style: TextStyle(color: Colors.black)),
+                            ),
+                            // Scanning Line
+                            AnimatedBuilder(
+                              animation: _controller,
+                              builder: (context, child) {
+                                return Positioned(
+                                  top: 232 * _controller.value,
+                                  left: 0,
+                                  right: 0,
+                                  child: Container(
+                                    height: 2,
+                                    decoration: BoxDecoration(
+                                      color: palette.primary,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: palette.primary.withOpacity(0.8),
+                                          blurRadius: 10,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Timer
+                  SizedBox(
+                    width: 320,
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "EXPIRES IN",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: palette.textGray,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  "00:14",
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: palette.text,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.sync,
+                                  size: 16,
+                                  color: palette.primary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  "Auto-refreshing",
+                                  style: TextStyle(
+                                    color: palette.primary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 8,
+                            backgroundColor: palette.textGray.withOpacity(0.2),
+                            color: palette.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: palette.primary,
+                            minimumSize: const Size(double.infinity, 56),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.refresh, color: Colors.white),
+                              SizedBox(width: 8),
+                              Text(
+                                "Generate Kode Baru",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Footer
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: palette.textGray.withOpacity(0.1))),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildFooterBtn(
+                                Icons.brightness_high,
+                                "Max Brightness",
+                                palette,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          "Scan code ini pada monitor scanner.",
+                          style: TextStyle(fontSize: 12, color: palette.textGray),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooterBtn(IconData icon, String text, AppPalette palette) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: palette.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.textGray.withOpacity(0.2)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: palette.textGray),
+          const SizedBox(height: 8),
+          Text(
+            text,
+            style: TextStyle(fontSize: 12, color: palette.textGray),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- 6. Schedule Screen ---
+class ScheduleScreen extends StatelessWidget {
+  const ScheduleScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Scaffold(
+      backgroundColor: palette.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      "Schedule",
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: palette.text,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        SlidePageRoute(page: const NotificationScreen()),
+                      );
+                    },
+                    icon: Badge(
+                      child: Icon(
+                        Icons.notifications_outlined,
+                        color: palette.text,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const CircleAvatar(
+                    backgroundImage: NetworkImage(
+                      'https://lh3.googleusercontent.com/aida-public/AB6AXuA9YARIuoG2VkpMA6dAKVhV8n-_-DbKOWdE5PNKzp0RyoQmQaqcQ0DZFwOeziLmWQe4k2E4OnBpxuY0Kz2l8J4XQNMNUPXYtilmF5mqZF_6IpGpK0aNgKPol1XXonhdKxDjxPCKIfdFXqZiVEnEyjGa8kZdKmJdx7OQLap25Rdg2_RYpMQ66AXPKqsCBqmGtz2YTmcnrTcgEDDSm7C4Qa7AlLgxDfIkisiebIGg9dZFAY45AjIW-u8cSJByMCgQP9PxsKXrJ_hvcw',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Month Selector
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.chevron_left, color: palette.text),
+                    onPressed: () {},
+                  ),
+                  Text(
+                    "October 2023",
+                    style: TextStyle(fontWeight: FontWeight.bold, color: palette.text),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.chevron_right, color: palette.text),
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+            ),
+            // Date Strip
+            SizedBox(
+              height: 70,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  _buildDateItem("Mon", "23", false, palette),
+                  _buildDateItem("Tue", "24", false, palette),
+                  _buildDateItem("Wed", "25", true, palette), // Active
+                  _buildDateItem("Thu", "26", false, palette),
+                  _buildDateItem("Fri", "27", false, palette),
+                  _buildDateItem("Sat", "28", false, palette),
+                ],
+              ),
+            ),
+            Divider(height: 32, color: palette.textGray.withOpacity(0.1)),
+            // Timeline Content
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  Text(
+                    "3 Classes Today",
+                    style: TextStyle(color: palette.textGray, fontSize: 14),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildClassCard(
+                    "09:00",
+                    "AM",
+                    "Mathematics",
+                    "Room 101",
+                    "Prof. Smith",
+                    Colors.green,
+                    palette,
+                    isDone: true,
+                  ),
+                  // Time divider
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 50,
+                          child: Text(
+                            "10:45",
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              color: palette.primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        CircleAvatar(
+                          radius: 5,
+                          backgroundColor: palette.primary,
+                        ),
+                        Expanded(
+                          child: Container(height: 2, color: palette.primary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _buildClassCard(
+                    "11:00",
+                    "AM",
+                    "History",
+                    "Room 3B",
+                    "Dr. Jones",
+                    palette.primary,
+                    palette,
+                    isLive: true,
+                  ),
+                  const SizedBox(height: 24),
+                  _buildClassCard(
+                    "02:00",
+                    "PM",
+                    "Physics",
+                    "Lab 4",
+                    "Mrs. Davis",
+                    Colors.orange,
+                    palette,
+                  ),
+                  const SizedBox(height: 40),
+                  Center(
+                    child: Column(
+                      children: [
+                        Icon(Icons.bedtime, size: 40, color: palette.textGray.withOpacity(0.3)),
+                        const SizedBox(height: 8),
+                        Text(
+                          "No more classes for today.",
+                          style: TextStyle(color: palette.textGray.withOpacity(0.5)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateItem(String day, String date, bool isActive, AppPalette palette) {
+    return Container(
+      width: 60,
+      margin: const EdgeInsets.only(right: 12),
+      decoration: BoxDecoration(
+        color: isActive ? palette.primary : palette.card,
+        borderRadius: BorderRadius.circular(12),
+        border: isActive ? null : Border.all(color: palette.textGray.withOpacity(0.1)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            day,
+            style: TextStyle(
+              fontSize: 12,
+              color: isActive ? Colors.white : palette.textGray,
+            ),
+          ),
+          Text(
+            date,
+            style: TextStyle(
+              fontSize: 18, 
+              fontWeight: FontWeight.bold,
+              color: isActive ? Colors.white : palette.text,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClassCard(
+    String time,
+    String period,
+    String title,
+    String loc,
+    String prof,
+    Color accent,
+    AppPalette palette, {
+    bool isDone = false,
+    bool isLive = false,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 50,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                time,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isLive ? palette.primary : palette.text,
+                ),
+              ),
+              Text(
+                period,
+                style: TextStyle(fontSize: 10, color: palette.textGray),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: palette.card,
+              borderRadius: BorderRadius.circular(16),
+              border: isLive
+                  ? Border.all(color: palette.primary, width: 2)
+                  : Border.all(color: palette.textGray.withOpacity(0.1)),
+              boxShadow: isLive
+                  ? [
+                      BoxShadow(
+                        color: palette.primary.withOpacity(0.1),
+                        blurRadius: 10,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: palette.text,
+                              ),
+                            ),
+                            if (isDone)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Text(
+                                  "Done",
+                                  style: TextStyle(
+                                    color: Colors.green,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                            if (isLive)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: palette.primary.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 3,
+                                      backgroundColor: palette.primary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      "Live",
+                                      style: TextStyle(
+                                        color: palette.primary,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                        if (isLive)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              "In Progress • 45m remaining",
+                              style: TextStyle(
+                                color: palette.primary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            _buildDetailIcon(Icons.location_on, loc, palette),
+                            const SizedBox(width: 16),
+                            _buildDetailIcon(Icons.person, prof, palette),
+                          ],
+                        ),
+                        if (isLive)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: palette.primary,
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () {},
+                              icon: const Icon(Icons.qr_code_scanner, size: 16),
+                              label: const Text("Check-in via QR"),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailIcon(IconData icon, String label, AppPalette palette) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: palette.textGray),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(color: palette.textGray, fontSize: 12),
+        ),
+      ],
+    );
+  }
+}
+
+// --- 7. Profile Screen ---
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      backgroundColor: palette.background,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          "Profil Saya",
+          style: TextStyle(fontWeight: FontWeight.bold, color: palette.text),
+        ),
+        centerTitle: true,
+        actions: [
+          // --- TOMBOL SWITCH TEMA ---
+          IconButton(
+            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: palette.text),
+            onPressed: () {
+              themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
+            },
+          ),
+          IconButton(onPressed: () {}, icon: Icon(Icons.more_vert, color: palette.text)),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            // Avatar
+            Stack(
+              children: [
+                Container(
+                  width: 112,
+                  height: 112,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: palette.card, width: 4),
+                    image: const DecorationImage(
+                      image: NetworkImage(
+                        'https://lh3.googleusercontent.com/aida-public/AB6AXuCS2wLIRuaA4o4TcoNFWX71Z1Pkt-6kf8qcrFIDPaUqrBqykOnIncYNZ8EHTe0TN5tZPRngQKW-8VNSTLZCdM0xm5JLjNK7nvNAMCHhuzjm1eP-d2E96ni_MeXOHquhePonpYFpRrBDCdx1AWvnWpL1b8uSk2jd-oJ8DOLjRqynVPz8p7sdZW7oOdY45H3AbMzLA3OvhA2tyMbLqW1SG87UKkfzWXSBqiwGALwCaXJ3Z5QCEkJXOH4tQg7iQWb5jGnbQKkrHgtW0w',
+                      ),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: palette.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: palette.background,
+                        width: 4,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.edit,
+                      size: 14,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "Alex Johnson",
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: palette.text),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.badge, size: 16, color: palette.textGray),
+                const SizedBox(width: 4),
+                Text(
+                  "NISN: 0012345678",
+                  style: TextStyle(color: palette.textGray),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: palette.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                "Rekayasa Perangkat Lunak",
+                style: TextStyle(
+                  color: palette.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Digital ID Card
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "Digital Student ID",
+                  style: TextStyle(fontWeight: FontWeight.bold, color: palette.text),
+                ),
+                TextButton(
+                  onPressed: () {},
+                  child: Text(
+                    "View Full Card",
+                    style: TextStyle(fontSize: 12, color: palette.primary),
+                  ),
+                ),
+              ],
+            ),
+            Container(
+              height: 200,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF101d22), Color(0xFF1c3038)], // Keep ID card dark always
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white12),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black45, blurRadius: 10),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment.topRight,
+                          radius: 1.5,
+                          colors: [
+                            palette.primary.withOpacity(0.2),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "SMKN 1 Pacitan",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const Text(
+                                  "Kartu Pelajar",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.yellow,
+                                    Colors.pink,
+                                    Colors.cyan,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Card Holder",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                Text(
+                                  "ALEX JOHNSON",
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  "Berlaku Sampai",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                Text(
+                                  "09/26",
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              color: Colors.white,
+                              child: Image.network(
+                                'https://lh3.googleusercontent.com/aida-public/AB6AXuBgPJtDxmFhiFAHn3YBz_EYZ8uDlw5OoQCXFoaYIKn7XcroXYukyE_X4jgVxdFC5dD37XdDh__BHCKtDhj-znrN1ucnljiByafG4p-wrJ-4OyGhHnvpYCH-2OpblU94jdE20TDHd5sPYbGo5JZf4yOgwcdXsPZocb7cO6lX5lCz8VDsOmYS8pYY7vUo0sxuO67P9B5ijaldWRBfpGAUh6KHEdtfmsgCSSTcoGQJTNZtcvahwcIMbNYp9wBqWKQ6y7-k1Yk853lp4w',
+                                width: 60,
+                                height: 60,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Link to Permissions
+            ListTile(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  SlidePageRoute(page: const SubmitPermissionScreen()),
+                );
+              },
+              tileColor: palette.card,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.verified_user, color: Colors.purple),
+              ),
+              title: Text("Surat Izin", style: TextStyle(color: palette.text)),
+              subtitle: Text("Upload surat izin, jika tidak masuk", style: TextStyle(color: palette.textGray)),
+              trailing: Icon(
+                Icons.chevron_right,
+                color: palette.textGray,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildSettingGroup("Account Settings", [
+              _buildSettingItem(
+                Icons.person,
+                Colors.blue,
+                "Personal Information",
+                "Email, Phone, Address",
+                palette,
+              ),
+              _buildSettingItem(
+                Icons.school,
+                Colors.purple,
+                "Academic Details",
+                "Grades, Schedule",
+                palette,
+              ),
+            ], palette),
+            const SizedBox(height: 24),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red.shade300,
+                side: BorderSide(color: Colors.red.shade900),
+                minimumSize: const Size(double.infinity, 50),
+                backgroundColor: Colors.red.withOpacity(0.05),
+              ),
+              onPressed: () {
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+              },
+              icon: const Icon(Icons.logout),
+              label: const Text("Log Out"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingGroup(String title, List<Widget> items, AppPalette palette) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title.toUpperCase(),
+          style: TextStyle(
+            fontSize: 12,
+            color: palette.textGray,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: palette.card,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(children: items),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSettingItem(
+    IconData icon,
+    Color color,
+    String title,
+    String sub,
+    AppPalette palette,
+  ) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: color),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: palette.text),
+      ),
+      subtitle: Text(
+        sub,
+        style: TextStyle(fontSize: 12, color: palette.textGray),
+      ),
+      trailing: Icon(Icons.chevron_right, color: palette.textGray),
+    );
+  }
+}
+
+// --- 8. Submit Permission Screen ---
+class SubmitPermissionScreen extends StatelessWidget {
+  const SubmitPermissionScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Scaffold(
+      backgroundColor: palette.background,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: Text("Upload Surat Izin", style: TextStyle(color: palette.text)),
+        centerTitle: true,
+        iconTheme: IconThemeData(color: palette.text),
+      ),
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Alasan",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: palette.text),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  dropdownColor: palette.card,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: palette.card,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  value: null,
+                  hint: Text("Pilih alasan...", style: TextStyle(color: palette.textGray)),
+                  items: [
+                    DropdownMenuItem(value: "sick", child: Text("Sakit", style: TextStyle(color: palette.text))),
+                    DropdownMenuItem(
+                      value: "personal",
+                      child: Text("Izin", style: TextStyle(color: palette.text)),
+                    ),
+                  ],
+                  onChanged: (v) {},
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "Durasi",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: palette.text),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: _buildDateInput("Dari", "Sep 12, 2023", palette)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _buildDateInput("Sampai", "Sep 14, 2023", palette)),
+                  ],
+                ),
+                // Timeline connector visual
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Stack(
+                          alignment: Alignment.centerLeft,
+                          children: [
+                            Container(
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: palette.textGray.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            FractionallySizedBox(
+                              widthFactor: 0.3,
+                              child: Container(
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: palette.primary,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              left: 20,
+                              child: CircleAvatar(
+                                radius: 6,
+                                backgroundColor: palette.primary,
+                              ),
+                            ),
+                            Positioned(
+                              left: 100,
+                              child: CircleAvatar(
+                                radius: 6,
+                                backgroundColor: palette.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        "3 Hari",
+                        style: TextStyle(
+                          color: palette.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  "Surat Izin",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: palette.text),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  height: 160,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: palette.card.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: palette.textGray.withOpacity(0.3),
+                      style: BorderStyle.solid,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: palette.primary.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.cloud_upload,
+                          color: palette.primary,
+                          size: 32,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: "Click to upload",
+                              style: TextStyle(
+                                color: palette.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            TextSpan(text: " or drag and drop", style: TextStyle(color: palette.textGray)),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        "Doctor's note, letter (MAX 5MB)",
+                        style: TextStyle(
+                          color: palette.textGray,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  "Catatan Tambahan (Opsional)",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: palette.text),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  maxLines: 4,
+                  style: TextStyle(color: palette.text),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: palette.card,
+                    hintText: "Tambahkan detail spesifik...",
+                    hintStyle: TextStyle(color: palette.textGray),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 100),
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    palette.background,
+                    palette.background.withOpacity(0),
+                  ],
+                ),
+              ),
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: palette.primary,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 56),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 8,
+                  shadowColor: palette.primary.withOpacity(0.4),
+                ),
+                onPressed: () {},
+                icon: const Text(
+                  "Kirim Surat",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                label: const Icon(Icons.send),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateInput(String label, String value, AppPalette palette) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: palette.textGray,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: palette.card,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.calendar_today,
+                color: palette.primary,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(value, style: TextStyle(fontWeight: FontWeight.bold, color: palette.text)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// --- History Screen ---
+class HistoryScreen extends StatelessWidget {
+  const HistoryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Scaffold(
+      backgroundColor: palette.background,
+      appBar: AppBar(
+        backgroundColor: palette.background,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: palette.text),
+          onPressed: () {},
+        ),
+        title: Text(
+          "Attendance History",
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: palette.text),
+        ),
+        centerTitle: true,
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: palette.textGray.withOpacity(0.1),
+            ),
+            child: IconButton(
+              icon: Icon(Icons.calendar_month, color: palette.primary),
+              onPressed: () {},
+            ),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: palette.textGray.withOpacity(0.1), height: 1),
+        ),
+      ),
+      body: Column(
+        children: [
+          // 1. Stats Summary
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: palette.background,
+            child: Row(
+              children: [
+                _buildSummaryCard("85%", "Overall", palette.primary, palette),
+                const SizedBox(width: 12),
+                _buildSummaryCard("18", "Present", Colors.green, palette),
+                const SizedBox(width: 12),
+                _buildSummaryCard("2", "Late", Colors.amber, palette),
+                const SizedBox(width: 12),
+                _buildSummaryCard("1", "Excused", Colors.purpleAccent, palette),
+              ],
+            ),
+          ),
+
+          // 2. Search & Filter
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            color: palette.background.withOpacity(0.95),
+            child: Column(
+              children: [
+                // Search Bar
+                Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: palette.card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: palette.textGray.withOpacity(0.1)),
+                  ),
+                  child: TextField(
+                    style: TextStyle(color: palette.text),
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(Icons.search, color: palette.textGray),
+                      hintText: "Search subjects...",
+                      hintStyle: TextStyle(color: palette.textGray),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Filter Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildFilterChip("October 2023", isActive: true, palette: palette),
+                      const SizedBox(width: 12),
+                      _buildFilterChip("All Status", isActive: false, palette: palette),
+                      const SizedBox(width: 12),
+                      _buildFilterChip("Subject", isActive: false, palette: palette),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 3. List Content
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _buildSectionHeader("Today, Oct 24", palette),
+                _buildHistoryItem(
+                  date: "24",
+                  month: "Oct",
+                  subject: "Advanced Mathematics",
+                  time: "09:05 AM",
+                  room: "Room 304",
+                  status: "Present",
+                  statusColor: Colors.green,
+                  palette: palette,
+                ),
+                _buildHistoryItem(
+                  date: "24",
+                  month: "Oct",
+                  subject: "Physics 101",
+                  time: "11:30 AM",
+                  room: "Lab 2",
+                  status: "Present",
+                  statusColor: Colors.green,
+                  isGrayedOut: true,
+                  palette: palette,
+                ),
+
+                _buildSectionHeader("Yesterday, Oct 23", palette),
+                _buildHistoryItem(
+                  date: "23",
+                  month: "Oct",
+                  subject: "World History",
+                  time: "10:15 AM",
+                  room: "Hall B",
+                  status: "Late",
+                  statusColor: Colors.amber,
+                  dateColor: Colors.amber,
+                  palette: palette,
+                ),
+                _buildHistoryItem(
+                  date: "23",
+                  month: "Oct",
+                  subject: "Chemistry Lab",
+                  time: "--:--",
+                  room: "Lab 1",
+                  status: "Excused",
+                  statusColor: Colors.purpleAccent,
+                  isStrikethrough: true,
+                  palette: palette,
+                ),
+                _buildHistoryItem(
+                  date: "23",
+                  month: "Oct",
+                  subject: "Computer Science",
+                  time: "08:00 AM",
+                  room: "Lab 3",
+                  status: "Present",
+                  statusColor: Colors.green,
+                  palette: palette,
+                ),
+
+                _buildSectionHeader("Oct 20", palette),
+                _buildHistoryItem(
+                  date: "20",
+                  month: "Oct",
+                  subject: "English Literature",
+                  time: "01:30 PM",
+                  room: "Room 102",
+                  status: "Present",
+                  statusColor: Colors.green,
+                  palette: palette,
+                ),
+
+                const SizedBox(height: 80),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard(String value, String label, Color color, AppPalette palette) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: palette.card,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: palette.textGray.withOpacity(0.1)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: palette.textGray,
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, {required bool isActive, required AppPalette palette}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isActive ? palette.primary : palette.card,
+        borderRadius: BorderRadius.circular(20),
+        border: isActive ? null : Border.all(color: palette.textGray.withOpacity(0.1)),
+        boxShadow: isActive
+            ? [
+                BoxShadow(
+                  color: palette.primary.withOpacity(0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: isActive ? Colors.white : palette.text,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.expand_more,
+            color: isActive ? Colors.white : palette.text,
+            size: 18,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, AppPalette palette) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 12),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          color: palette.textGray,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryItem({
+    required String date,
+    required String month,
+    required String subject,
+    required String time,
+    required String room,
+    required String status,
+    required Color statusColor,
+    required AppPalette palette,
+    Color? dateColor,
+    bool isStrikethrough = false,
+    bool isGrayedOut = false,
+  }) {
+    final textColor = isStrikethrough ? palette.textGray : palette.text;
+    final displayDateColor =
+        dateColor ?? (isGrayedOut ? palette.textGray : palette.primary);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: palette.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.textGray.withOpacity(0.1)),
+      ),
+      child: Row(
+        children: [
+          // Date Box
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: displayDateColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  month.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: displayDateColor,
+                  ),
+                ),
+                Text(
+                  date,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: displayDateColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      subject,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                        decoration: isStrikethrough
+                            ? TextDecoration.lineThrough
+                            : null,
+                        decorationColor: palette.textGray,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: statusColor.withOpacity(0.2)),
+                      ),
+                      child: Text(
+                        status,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.schedule,
+                      size: 14,
+                      color: isStrikethrough
+                          ? Colors.grey.shade700
+                          : palette.textGray,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      time,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isStrikethrough
+                            ? Colors.grey.shade700
+                            : palette.textGray,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Icon(
+                      Icons.location_on,
+                      size: 14,
+                      color: isStrikethrough
+                          ? Colors.grey.shade700
+                          : palette.textGray,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      room,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isStrikethrough
+                            ? Colors.grey.shade700
+                            : palette.textGray,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Login Screen ---
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  bool _isObscure = true;
+  bool _rememberMe = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Scaffold(
+      backgroundColor: palette.background,
+      body: Stack(
+        children: [
+          // Background Glow Effects
+          Positioned(
+            top: -100,
+            left: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: palette.primary.withOpacity(0.1),
+                boxShadow: [
+                  BoxShadow(
+                    color: palette.primary.withOpacity(0.1),
+                    blurRadius: 100,
+                    spreadRadius: 50,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: palette.primary.withOpacity(0.1),
+                boxShadow: [
+                  BoxShadow(
+                    color: palette.primary.withOpacity(0.1),
+                    blurRadius: 100,
+                    spreadRadius: 50,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Center(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 100, sigmaY: 100),
+              child: Container(
+                width: MediaQuery.of(context).size.width,
+                height: MediaQuery.of(context).size.height,
+              ),
+            ),
+          ),
+
+          // Main Content
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Logo Placeholder
+                  Container(
+                    width: 96,
+                    height: 96,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: palette.card,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)
+                      ]
+                    ),
+                    child: Icon(
+                      Icons.school,
+                      size: 48,
+                      color: palette.text,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "EduTrack",
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: palette.text,
+                    ),
+                  ),
+                  Text(
+                    "Sign in to manage your attendance",
+                    style: TextStyle(fontSize: 16, color: palette.textGray),
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Form
+                  _buildTextField(
+                    icon: Icons.person_outline,
+                    hint: "Student ID or Email",
+                    palette: palette,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    icon: Icons.lock_outline,
+                    hint: "Password",
+                    isPassword: true,
+                    isObscure: _isObscure,
+                    onToggle: () => setState(() => _isObscure = !_isObscure),
+                    palette: palette,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Utilities
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Checkbox(
+                              value: _rememberMe,
+                              activeColor: palette.primary,
+                              side: BorderSide(color: palette.textGray),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              onChanged: (v) =>
+                                  setState(() => _rememberMe = v!),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Remember Me",
+                            style: TextStyle(
+                              color: palette.textGray,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      TextButton(
+                        onPressed: () {},
+                        child: Text(
+                          "Forgot Password?",
+                          style: TextStyle(color: palette.primary),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Login Button
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const MainLayout()),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: palette.primary,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 8,
+                      shadowColor: palette.primary.withOpacity(0.3),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Login",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Icon(Icons.login),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Divider
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(height: 1, color: palette.textGray.withOpacity(0.2)),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          "Or continue with",
+                          style: TextStyle(
+                            color: palette.textGray,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(height: 1, color: palette.textGray.withOpacity(0.2)),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // SSO Button
+                  OutlinedButton.icon(
+                    onPressed: () {},
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: palette.text,
+                      side: BorderSide(color: palette.textGray.withOpacity(0.2)),
+                      minimumSize: const Size(double.infinity, 56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      backgroundColor: palette.card,
+                    ),
+                    icon: Icon(Icons.school, color: palette.primary),
+                    label: const Text("Sign in with School ID (SSO)"),
+                  ),
+
+                  const SizedBox(height: 24),
+                  TextButton.icon(
+                    onPressed: () {},
+                    icon: Icon(
+                      Icons.support_agent,
+                      size: 18,
+                      color: palette.textGray,
+                    ),
+                    label: Text(
+                      "Need help? Contact Support",
+                      style: TextStyle(color: palette.textGray),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required IconData icon,
+    required String hint,
+    required AppPalette palette,
+    bool isPassword = false,
+    bool isObscure = false,
+    VoidCallback? onToggle,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: palette.textGray.withOpacity(0.1)),
+      ),
+      child: TextField(
+        obscureText: isObscure,
+        style: TextStyle(color: palette.text),
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon, color: palette.textGray),
+          suffixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    isObscure ? Icons.visibility_off : Icons.visibility,
+                    color: palette.textGray,
+                  ),
+                  onPressed: onToggle,
+                )
+              : null,
+          hintText: hint,
+          hintStyle: TextStyle(color: palette.textGray),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 16,
+            horizontal: 16,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- Notification Screen ---
+class NotificationScreen extends StatelessWidget {
+  const NotificationScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Scaffold(
+      backgroundColor: palette.background,
+      appBar: AppBar(
+        backgroundColor: palette.background.withOpacity(0.95),
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: palette.text),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          "Notifications",
+          style: TextStyle(fontWeight: FontWeight.bold, color: palette.text),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {},
+            child: Text(
+              "Mark all read",
+              style: TextStyle(color: palette.primary, fontSize: 12),
+            ),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: palette.textGray.withOpacity(0.1), height: 1),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildSectionHeader("Today", "2 New", palette),
+          _buildNotificationItem(
+            icon: Icons.check_circle,
+            color: palette.success,
+            title: "Attendance Confirmed",
+            desc: "You successfully checked in for Biology 101.",
+            time: "9:05 AM",
+            isUnread: true,
+            palette: palette,
+          ),
+          _buildNotificationItem(
+            icon: Icons.notifications_active,
+            color: palette.primary,
+            title: "Upcoming Class",
+            desc: "Math 202 starts in 15 minutes in Room 304.",
+            time: "1:45 PM",
+            isUnread: true,
+            palette: palette,
+          ),
+
+          _buildSectionHeader("Yesterday", null, palette),
+          _buildNotificationItem(
+            icon: Icons.pending_actions,
+            color: palette.warning,
+            title: "Permission Pending",
+            desc: "Your sick leave request for Oct 24 is under review.",
+            time: "4:30 PM",
+            isUnread: false,
+            palette: palette,
+          ),
+
+          _buildSectionHeader("Earlier", null, palette),
+          _buildNotificationItem(
+            icon: Icons.cancel,
+            color: palette.error,
+            title: "Permission Rejected",
+            desc: "Resubmit medical certificate. Image was blurry.",
+            time: "Oct 24",
+            isUnread: false,
+            palette: palette,
+          ),
+          _buildNotificationItem(
+            icon: Icons.campaign,
+            color: Colors.grey,
+            title: "Campus Announcement",
+            desc: "The main library will be closed for maintenance.",
+            time: "Oct 20",
+            isUnread: false,
+            palette: palette,
+          ),
+
+          const SizedBox(height: 40),
+          Center(
+            child: Column(
+              children: [
+                Icon(Icons.inbox, size: 40, color: palette.textGray.withOpacity(0.3)),
+                const SizedBox(height: 8),
+                Text(
+                  "No older notifications",
+                  style: TextStyle(color: palette.textGray.withOpacity(0.5)),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, String? badge, AppPalette palette) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, top: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: palette.text,
+            ),
+          ),
+          if (badge != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: palette.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                badge,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: palette.primary,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationItem({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String desc,
+    required String time,
+    required bool isUnread,
+    required AppPalette palette,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: palette.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isUnread ? Colors.transparent : palette.textGray.withOpacity(0.1),
+        ),
+        boxShadow: isUnread
+            ? [
+                BoxShadow(
+                  color: palette.primary.withOpacity(0.1),
+                  blurRadius: 10,
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: palette.text,
+                      ),
+                    ),
+                    if (isUnread)
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: palette.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  desc,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: palette.textGray,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  time,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: palette.textGray,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Transitions ---
+class SlidePageRoute extends PageRouteBuilder {
+  final Widget page;
+
+  SlidePageRoute({required this.page})
+    : super(
+        pageBuilder: (context, animation, secondaryAnimation) => page,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+
+          var tween = Tween(
+            begin: begin,
+            end: end,
+          ).chain(CurveTween(curve: curve));
+
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(
+          milliseconds: 300,
+        ),
+      );
+}
+
+class ScalePageRoute extends PageRouteBuilder {
+  final Widget page;
+
+  ScalePageRoute({required this.page})
+    : super(
+        pageBuilder: (context, animation, secondaryAnimation) => page,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const curve = Curves.fastOutSlowIn;
+          var tween = Tween(
+            begin: 0.0,
+            end: 1.0,
+          ).chain(CurveTween(curve: curve));
+
+          return ScaleTransition(
+            scale: animation.drive(tween),
+            alignment: const Alignment(0, 0.85),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(
+          milliseconds: 350,
+        ),
+      );
+}

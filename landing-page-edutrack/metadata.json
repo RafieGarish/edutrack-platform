@@ -1,0 +1,9 @@
+{
+  "name": "EduTrack",
+  "description": "Smart Attendance App with QR Code and GPS Verification.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": []
+}
