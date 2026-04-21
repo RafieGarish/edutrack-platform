@@ -52,7 +52,7 @@ const navItems: { section: string; links: NavLink[] }[] = [
     links: [
       { label: "Jadwal", href: "/dashboard/schedules", icon: CalendarDays },
       { label: "Kelola Izin", href: "/dashboard/permissions", icon: FileText },
-      { label: "Kelola Scanner", href: "https://edutrack-scanner.vercel.app", icon: ScanLine, target: "_blank" },
+      { label: "Scanner", href: "https://edutrack-scanner.vercel.app", icon: ScanLine, target: "_blank" },
       { label: "Notifikasi (Coming Soon)", href: "/dashboard/notifications", icon: Bell },
     ],
   },
