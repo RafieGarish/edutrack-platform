@@ -58,9 +58,9 @@ export default async function DashboardPage() {
               {/* <Insights /> */}
               <ChartPieDonutText />
             </div>
-            <div className="animate-stagger animate-slide-in-right delay-300">
+            {/* <div className="animate-stagger animate-slide-in-right delay-300">
               <RevenueAnalytics />
-            </div>
+            </div> */}
             <div className="animate-stagger animate-slide-in-right delay-400">
               <PerformanceMetrics />
             </div>

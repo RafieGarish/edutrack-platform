@@ -642,3 +642,26 @@ export async function getSchedulesList(params?: { kelasId?: number; hari?: strin
   if (error) return { error: error.message, data: [] };
   return { data };
 }
+
+// ── Recent Attendance (Dashboard Widget) ──
+export async function getRecentAttendance(limit: number = 10) {
+  const schoolId = await getSchoolId();
+
+  const { data, error } = await supabaseAdmin
+    .from('absensi')
+    .select(`
+      id,
+      tanggal,
+      status,
+      check_in_time,
+      catatan,
+      created_at,
+      siswa!inner(id, nisn, nama_lengkap, kelas, foto_url)
+    `)
+    .eq('school_id', schoolId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) return { error: error.message, data: [] };
+  return { data: data || [] };
+}
