@@ -67,3 +67,5 @@ landing-page-edutrack/.DS_Store
 landing-page-edutrack/*.log
 landing-page-edutrack/.env*
 landing-page-edutrack/!.env.example
+p.txt
+planning.txt

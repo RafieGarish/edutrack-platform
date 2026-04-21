@@ -67,7 +67,7 @@ const subtitleCharVariants = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function BlurText({ text, containerVariant, charVariant, charStyle = {} }) {
+function BlurText({ text, containerVariant, charVariant, charStyle = {} }: { text: string, containerVariant: any, charVariant: any, charStyle?: any }) {
   const chars = text.split("");
   return (
     <motion.span

@@ -143,37 +143,34 @@ export async function processAttendance(
     const currentTimeStr = getCurrentTimeStr(); 
     const currentMinutes = timeToMinutes(currentTimeStr);
 
-    // 4. Find Active Jadwal
-    const { data: jadwalList, error: jadwalError } = await supabaseAdmin
-      .from('jadwal')
-      .select(`id, mata_pelajaran_id, hari, jam_mulai, jam_selesai, ruangan, mata_pelajaran ( id, kode, nama, guru )`)
-      .eq('kelas_id', siswa.kelas_id)
-      .eq('school_id', schoolId)
-      .eq('hari', hariIni);
-
-    if (jadwalError) {
-      return { success: false, error: 'db_error', message: 'Gagal membaca jadwal.' };
-    }
-
-    const activeJadwal = jadwalList?.find((j) => {
-      const mulaiMinus30 = timeToMinutes(j.jam_mulai) - 30;
-      const selesai = timeToMinutes(j.jam_selesai);
-      return currentMinutes >= mulaiMinus30 && currentMinutes <= selesai;
-    });
-
-    if (!activeJadwal) {
-      return { success: false, error: 'no_active_class', message: `Tidak ada jadwal pelajaran aktif untuk ${siswa.kelas} saat ini (${hariIni}, ${currentTimeStr.substring(0, 5)}).` };
-    }
-
-    const mataPelajaran = activeJadwal.mata_pelajaran as any;
     const today = getTodayDate();
 
-    // 5. Check already checked in
+    // 4. Check if there is an approved or pending perizinan for today
+    const { data: izinData, error: izinError } = await supabaseAdmin
+      .from('perizinan')
+      .select('status, alasan')
+      .eq('siswa_id', siswa.id)
+      .eq('school_id', schoolId)
+      .lte('tanggal_mulai', today)
+      .gte('tanggal_selesai', today)
+      .not('status', 'eq', 'Rejected');
+
+    if (!izinError && izinData && izinData.length > 0) {
+      const approved = izinData.find(i => i.status === 'Approved');
+      if (approved) {
+        return { success: false, error: 'has_permission', message: `Siswa tidak bisa absen karena memiliki izin (${approved.alasan}) yang disetujui.` };
+      }
+      const pending = izinData.find(i => i.status === 'Pending');
+      if (pending) {
+        return { success: false, error: 'has_permission', message: `Siswa memiliki pengajuan izin (${pending.alasan}) yang belum disetujui.` };
+      }
+    }
+
+    // 5. Check if already checked in today (daily basis)
     const { data: existingRecord, error: checkError } = await supabaseAdmin
       .from('absensi')
       .select('id')
       .eq('siswa_id', siswa.id)
-      .eq('mata_pelajaran_id', activeJadwal.mata_pelajaran_id)
       .eq('tanggal', today)
       .maybeSingle();
 
@@ -182,18 +179,46 @@ export async function processAttendance(
     }
 
     if (existingRecord) {
-      return { success: false, error: 'already_checked_in', message: `${siswa.nama_lengkap} sudah absen untuk ${mataPelajaran?.nama ?? 'mata pelajaran ini'} hari ini.` };
+      return { success: false, error: 'already_checked_in', message: `${siswa.nama_lengkap} sudah absen hari ini.` };
     }
 
-    const jamMulaiMinutes = timeToMinutes(activeJadwal.jam_mulai);
-    const status: 'Present' | 'Late' = currentMinutes <= jamMulaiMinutes + 10 ? 'Present' : 'Late';
+    // 6. Get all schedules for today to determine first and last schedule
+    const { data: jadwalList, error: jadwalError } = await supabaseAdmin
+      .from('jadwal')
+      .select(`id, mata_pelajaran_id, hari, jam_mulai, jam_selesai, ruangan, mata_pelajaran ( id, kode, nama, guru )`)
+      .eq('kelas_id', siswa.kelas_id)
+      .eq('school_id', schoolId)
+      .eq('hari', hariIni)
+      .order('jam_mulai', { ascending: true });
 
-    // 6. Insert Absensi
+    if (jadwalError) {
+      return { success: false, error: 'db_error', message: 'Gagal membaca jadwal.' };
+    }
+
+    if (!jadwalList || jadwalList.length === 0) {
+      return { success: false, error: 'no_active_class', message: `Tidak ada jadwal pelajaran hari ini (${hariIni}).` };
+    }
+
+    const firstSchedule = jadwalList[0];
+    const lastSchedule = jadwalList[jadwalList.length - 1];
+
+    const jamPertamaMinutes = timeToMinutes(firstSchedule.jam_mulai);
+    const jamTerakhirSelesaiMinutes = timeToMinutes(lastSchedule.jam_selesai);
+
+    // Open from 00:00 to jamTerakhirSelesaiMinutes
+    if (currentMinutes > jamTerakhirSelesaiMinutes) {
+      return { success: false, error: 'no_active_class', message: `Waktu absensi untuk hari ini telah berakhir.` };
+    }
+
+    // Lateness logic based on first schedule
+    const status: 'Present' | 'Late' = currentMinutes <= jamPertamaMinutes ? 'Present' : 'Late';
+
+    // 7. Insert Absensi (linked to the first schedule of the day to satisfy unique constraints)
     const { error: insertError } = await supabaseAdmin.from('absensi').insert({
       school_id: schoolId,
       siswa_id: siswa.id,
-      mata_pelajaran_id: activeJadwal.mata_pelajaran_id,
-      jadwal_id: activeJadwal.id,
+      mata_pelajaran_id: firstSchedule.mata_pelajaran_id,
+      jadwal_id: firstSchedule.id,
       tanggal: today,
       check_in_time: currentTimeStr,
       status,
@@ -204,6 +229,8 @@ export async function processAttendance(
     if (insertError) {
       return { success: false, error: 'insert_failed', message: 'Gagal menyimpan data absensi.' };
     }
+
+    const mataPelajaran = firstSchedule.mata_pelajaran as any;
 
     return {
       success: true,

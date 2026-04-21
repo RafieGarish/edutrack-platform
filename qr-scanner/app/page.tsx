@@ -151,6 +151,7 @@ export default function Page() {
             decrypt_failed: 'QR Code tidak valid',
             invalid_format: 'Format QR tidak dikenali',
             no_active_class: 'Tidak ada jadwal aktif', // Added missing error mapping
+            has_permission: 'Status Izin',
           };
 
           addToast({

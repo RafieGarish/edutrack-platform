@@ -25,11 +25,11 @@ import TodayDate from "./todaydate"
 export const description = "A donut chart with text"
 
 const chartData = [
-  { browser: "hadir", visitors: 275, fill: "var(--color-hadir)" },
-  { browser: "safari", visitors: 200, fill: "var(--color-safari)" },
-  { browser: "firefox", visitors: 287, fill: "var(--color-firefox)" },
-  { browser: "edge", visitors: 173, fill: "var(--color-edge)" },
-  { browser: "other", visitors: 190, fill: "var(--color-other)" },
+  { browser: "hadir", visitors: 275, fill: "var(--color-terlambat)" },
+  { browser: "terlambat", visitors: 200, fill: "var(--color-hadir)" },
+  { browser: "sakit", visitors: 287, fill: "var(--color-sakit)" },
+  { browser: "izin", visitors: 173, fill: "var(--color-izin)" },
+  { browser: "tidak_hadir", visitors: 190, fill: "var(--color-tidak_hadir)" },
 ]
 
 const chartConfig = {
@@ -40,20 +40,20 @@ const chartConfig = {
     label: "Hadir",
     color: "hsl(var(--chart-1))",
   },
-  safari: {
-    label: "Safari",
+  terlambat: {
+    label: "Terlambat",
     color: "hsl(var(--chart-2))",
   },
-  firefox: {
-    label: "Firefox",
+  sakit: {
+    label: "Sakit",
     color: "hsl(var(--chart-3))",
   },
-  edge: {
-    label: "Edge",
+  izin: {
+    label: "Izin",
     color: "hsl(var(--chart-4))",
   },
-  other: {
-    label: "Other",
+  tidak_hadir: {
+    label: "Tidak Hadir",
     color: "hsl(var(--chart-5))",
   },
 } satisfies ChartConfig
@@ -67,7 +67,7 @@ export function ChartPieDonutText() {
     <Card className="flex flex-col">
       <CardHeader className="items-center pb-0">
         <CardTitle>Statistik absensi hari ini</CardTitle>
-        <CardDescription><TodayDate/></CardDescription>
+        <CardDescription><TodayDate /></CardDescription>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
         <ChartContainer

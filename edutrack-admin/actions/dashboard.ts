@@ -454,6 +454,16 @@ export async function updatePermissionStatus(
   const user = await getCurrentUser();
   if (!user) return { error: 'Unauthorized' };
 
+  // Get permission details first
+  const { data: permission, error: getError } = await supabaseAdmin
+    .from('perizinan')
+    .select('siswa_id, tanggal_mulai, tanggal_selesai, alasan')
+    .eq('id', permissionId)
+    .eq('school_id', user.school_id)
+    .single();
+
+  if (getError || !permission) return { error: getError?.message || 'Permission not found' };
+
   const { error } = await supabaseAdmin
     .from('perizinan')
     .update({
@@ -463,6 +473,143 @@ export async function updatePermissionStatus(
     })
     .eq('id', permissionId)
     .eq('school_id', user.school_id);
+
+  if (error) return { error: error.message };
+
+  if (status === 'Approved') {
+    // Generate dates from tanggal_mulai to tanggal_selesai
+    const start = new Date(permission.tanggal_mulai);
+    const end = new Date(permission.tanggal_selesai);
+    const absensiRecords = [];
+
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      absensiRecords.push({
+        school_id: user.school_id,
+        siswa_id: permission.siswa_id,
+        tanggal: dateStr,
+        status: 'Excused',
+        catatan: permission.alasan,
+        scanned_by: user.id,
+      });
+    }
+
+    if (absensiRecords.length > 0) {
+      // Clean up any existing attendance for these dates to prevent duplicates
+      const startDateStr = start.toISOString().split('T')[0];
+      const endDateStr = end.toISOString().split('T')[0];
+      await supabaseAdmin
+        .from('absensi')
+        .delete()
+        .eq('siswa_id', permission.siswa_id)
+        .gte('tanggal', startDateStr)
+        .lte('tanggal', endDateStr);
+
+      await supabaseAdmin.from('absensi').insert(absensiRecords);
+    }
+  }
+
+  return { success: true };
+}
+
+// ── Teachers List ──
+export async function getTeachersList(params?: {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const schoolId = await getSchoolId();
+
+  // Count query
+  let countQuery = supabaseAdmin
+    .from('teachers')
+    .select('*', { count: 'exact', head: true })
+    .eq('school_id', schoolId);
+
+  // Data query
+  let query = supabaseAdmin
+    .from('teachers')
+    .select('*')
+    .eq('school_id', schoolId)
+    .order('name');
+
+  if (params?.search) {
+    const filter = `name.ilike.%${params.search}%,nip.ilike.%${params.search}%,email.ilike.%${params.search}%`;
+    query = query.or(filter);
+    countQuery = countQuery.or(filter);
+  }
+
+  const limit = params?.limit || 10;
+  const offset = params?.offset || 0;
+  query = query.range(offset, offset + limit - 1);
+
+  const [{ data, error }, { count }] = await Promise.all([query, countQuery]);
+  if (error) return { error: error.message, data: [], count: 0 };
+  return { data: data || [], count: count || 0 };
+}
+
+// ── Create Teacher ──
+export async function createTeacher(input: {
+  name: string;
+  nip: string;
+  email: string;
+  phone?: string;
+  subject?: string;
+}) {
+  const schoolId = await getSchoolId();
+
+  const { error } = await supabaseAdmin.from('teachers').insert({
+    school_id: schoolId,
+    name: input.name,
+    nip: input.nip || null,
+    email: input.email || null,
+    phone: input.phone || null,
+    subject: input.subject || null,
+  });
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+// ── Update Teacher ──
+export async function updateTeacher(
+  teacherId: string,
+  input: {
+    name?: string;
+    nip?: string;
+    email?: string;
+    phone?: string;
+    subject?: string;
+  }
+) {
+  const schoolId = await getSchoolId();
+
+  const update: Record<string, unknown> = {};
+  if (input.name !== undefined) update.name = input.name;
+  if (input.nip !== undefined) update.nip = input.nip || null;
+  if (input.email !== undefined) update.email = input.email || null;
+  if (input.phone !== undefined) update.phone = input.phone || null;
+  if (input.subject !== undefined) update.subject = input.subject || null;
+
+  const { error } = await supabaseAdmin
+    .from('teachers')
+    .update(update)
+    .eq('id', teacherId)
+    .eq('school_id', schoolId);
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+// ── Delete Teacher ──
+export async function deleteTeacher(teacherId: string) {
+  const schoolId = await getSchoolId();
+
+  const { error } = await supabaseAdmin
+    .from('teachers')
+    .delete()
+    .eq('id', teacherId)
+    .eq('school_id', schoolId);
 
   if (error) return { error: error.message };
   return { success: true };

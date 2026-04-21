@@ -1,9 +1,9 @@
 "use client"
 
-import { Home, ChevronRight, Plus, Users as UsersIcon, UserMinus, UserX, UserCheck, Search, RotateCcw, Eye, MoreVertical, GripHorizontal, ToggleLeft } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useState, useEffect, useCallback } from "react"
+import { Home, Plus, Users as UsersIcon, Search, Pencil, Trash2, X, Loader2, BookOpen } from "lucide-react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -11,41 +11,175 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import React from "react";
+} from "@/components/ui/breadcrumb"
+import React from "react"
+import {
+  getTeachersList,
+  createTeacher,
+  updateTeacher,
+  deleteTeacher,
+} from "@/actions/dashboard"
+
+interface TeacherRow {
+  id: string
+  name: string
+  nip: string | null
+  email: string | null
+  phone: string | null
+  subject: string | null
+  created_at: string
+}
 
 const ROUTE_LABELS: Record<string, string> = {
   dashboard: "Overview",
-  attendance: "Attendance",
-  students: "Students",
   teachers: "Teachers",
-  classes: "Classes",
-  schedules: "Schedules",
-  permissions: "Permissions",
-  notifications: "Notifications",
-  users: "Users",
-  settings: "Settings",
-};
-
-function getLabel(segment: string): string {
-  return ROUTE_LABELS[segment] ?? segment.charAt(0).toUpperCase() + segment.slice(1);
 }
 
-export default function Students() {
-  const pathname = usePathname();
-  const segments = pathname.split('/').filter(Boolean);
-  const afterDashboard = segments.slice(1);
+function getLabel(segment: string): string {
+  return ROUTE_LABELS[segment] ?? segment.charAt(0).toUpperCase() + segment.slice(1)
+}
+
+const PAGE_SIZE = 10
+
+export default function TeachersPage() {
+  const pathname = usePathname()
+  const segments = pathname.split('/').filter(Boolean)
+  const afterDashboard = segments.slice(1)
   const breadcrumbItems = afterDashboard.length === 0
     ? [{ label: 'Overview', href: '/dashboard', isCurrent: true }]
     : afterDashboard.map((seg, i) => ({
         label: getLabel(seg),
         href: '/' + segments.slice(0, i + 2).join('/'),
         isCurrent: i === afterDashboard.length - 1,
-      }));
+      }))
+
+  // Data state
+  const [teachers, setTeachers] = useState<TeacherRow[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  // Filter state
+  const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+
+  // Modal state
+  const [showModal, setShowModal] = useState(false)
+  const [editingTeacher, setEditingTeacher] = useState<TeacherRow | null>(null)
+  const [formName, setFormName] = useState("")
+  const [formNip, setFormNip] = useState("")
+  const [formEmail, setFormEmail] = useState("")
+  const [formPhone, setFormPhone] = useState("")
+  const [formSubject, setFormSubject] = useState("")
+  const [formError, setFormError] = useState("")
+  const [formLoading, setFormLoading] = useState(false)
+
+  // Delete state
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const fetchTeachers = useCallback(async () => {
+    setLoading(true)
+    const result = await getTeachersList({
+      search: search || undefined,
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE,
+    })
+    setTeachers((result.data || []) as TeacherRow[])
+    setTotalCount(result.count || 0)
+    setLoading(false)
+  }, [search, page])
+
+  useEffect(() => {
+    fetchTeachers()
+  }, [fetchTeachers])
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1)
+  }, [search])
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const showingFrom = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const showingTo = Math.min(page * PAGE_SIZE, totalCount)
+
+  function openCreateModal() {
+    setEditingTeacher(null)
+    setFormName("")
+    setFormNip("")
+    setFormEmail("")
+    setFormPhone("")
+    setFormSubject("")
+    setFormError("")
+    setShowModal(true)
+  }
+
+  function openEditModal(teacher: TeacherRow) {
+    setEditingTeacher(teacher)
+    setFormName(teacher.name)
+    setFormNip(teacher.nip || "")
+    setFormEmail(teacher.email || "")
+    setFormPhone(teacher.phone || "")
+    setFormSubject(teacher.subject || "")
+    setFormError("")
+    setShowModal(true)
+  }
+
+  async function handleFormSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setFormError("")
+    setFormLoading(true)
+
+    if (editingTeacher) {
+      const result = await updateTeacher(editingTeacher.id, {
+        name: formName,
+        nip: formNip,
+        email: formEmail,
+        phone: formPhone,
+        subject: formSubject,
+      })
+      if (result.error) {
+        setFormError(result.error)
+        setFormLoading(false)
+        return
+      }
+    } else {
+      if (!formName.trim()) {
+        setFormError("Nama guru wajib diisi.")
+        setFormLoading(false)
+        return
+      }
+      const result = await createTeacher({
+        name: formName,
+        nip: formNip,
+        email: formEmail,
+        phone: formPhone,
+        subject: formSubject,
+      })
+      if (result.error) {
+        setFormError(result.error)
+        setFormLoading(false)
+        return
+      }
+    }
+
+    setFormLoading(false)
+    setShowModal(false)
+    fetchTeachers()
+  }
+
+  async function handleDelete(teacherId: string) {
+    if (!confirm("Apakah Anda yakin ingin menghapus guru ini?")) return
+    setDeletingId(teacherId)
+    const result = await deleteTeacher(teacherId)
+    if (result.error) {
+      alert("Gagal menghapus: " + result.error)
+    }
+    setDeletingId(null)
+    fetchTeachers()
+  }
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 py-6">
-      {/* Breadcrumb — mobile only (desktop header already shows it) */}
+      {/* Breadcrumb — mobile only */}
       <div className="lg:hidden">
         <Breadcrumb>
           <BreadcrumbList>
@@ -76,9 +210,12 @@ export default function Students() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-50">Semua Guru</h1>
-          <p className="text-zinc-500 dark:text-zinc-400 mt-1">Kelola akun guru</p>
+          <p className="text-zinc-500 dark:text-zinc-400 mt-1">Kelola data guru</p>
         </div>
-        <button className="flex items-center gap-2 bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 px-4 py-2 rounded-full text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors self-start sm:self-auto shrink-0">
+        <button
+          onClick={openCreateModal}
+          className="flex items-center gap-2 bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 px-4 py-2 rounded-full text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors self-start sm:self-auto shrink-0"
+        >
           <Plus className="w-4 h-4" />
           Tambahkan Guru
         </button>
@@ -86,32 +223,25 @@ export default function Students() {
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard icon={UsersIcon} label="Total Guru" value="28" type="default" />
-        <StatCard icon={UserMinus} label="Kelas X" value="13" type="toggle" />
-        <StatCard icon={UserX} label="Kelas XI" value="15" type="toggle" />
-        <StatCard icon={UserCheck} label="Kelas XII" value="13" type="check" />
+        <StatCard icon={UsersIcon} label="Total Guru" value={totalCount.toString()} />
+        <StatCard icon={BookOpen} label="Halaman" value={`${page} / ${totalPages}`} />
+        <StatCard icon={UsersIcon} label="Ditampilkan" value={teachers.length.toString()} />
+        <StatCard icon={Search} label="Hasil Pencarian" value={totalCount.toString()} />
       </div>
 
-      {/* Filters */}
-      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 md:p-6 space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-          <FilterInput label="Username" placeholder="Filter by username" />
-          <FilterInput label="Email" placeholder="Filter by email" />
-          <FilterInput label="Phone" placeholder="Filter by phone" />
-          <FilterInput label="First Name" placeholder="Filter by first name" />
-          <FilterInput label="Last Name" placeholder="Filter by last name" />
-          <FilterInput label="From Date" placeholder="YYYY-MM-DD" type="date" />
-          <FilterInput label="To Date" placeholder="YYYY-MM-DD" type="date" />
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
-          <button className="flex items-center gap-2 bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 px-4 py-2 rounded-full text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors">
-            <Search className="w-4 h-4" />
-            Filter
-          </button>
-          <button className="flex items-center gap-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 px-4 py-2 rounded-full text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
-            <RotateCcw className="w-4 h-4" />
-            Reset
-          </button>
+      {/* Search & Filter */}
+      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari berdasarkan nama, NIP, atau email..."
+              className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-10 pr-4 py-2 text-sm text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-shadow"
+            />
+          </div>
         </div>
       </div>
 
@@ -121,125 +251,233 @@ export default function Students() {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-zinc-500 dark:text-zinc-400 font-medium border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
               <tr>
-                <th className="px-4 sm:px-6 py-4 font-medium">NISN</th>
+                <th className="px-4 sm:px-6 py-4 font-medium">NIP</th>
                 <th className="px-4 sm:px-6 py-4 font-medium">Nama</th>
                 <th className="px-4 sm:px-6 py-4 font-medium">Email</th>
                 <th className="px-4 sm:px-6 py-4 font-medium">No. HP</th>
-                <th className="px-4 sm:px-6 py-4 font-medium">Kelas</th>
-                <th className="px-4 sm:px-6 py-4 font-medium">Device ID</th>
+                <th className="px-4 sm:px-6 py-4 font-medium">Mata Pelajaran</th>
                 <th className="px-4 sm:px-6 py-4 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
-              <UserRow nisn="0012345678" name="Mike Johnson" email="mike.johnson@example.com" phone="+1555123456" kelas="XI RPL" device_id="PQ.1A4C" foto_url="https://restartbooking.com/img/artists/alan-walker.png" />
-              <UserRow nisn="0087654321" name="Charles Wilson" email="charles.wilson@example.com" phone="+1555741852" kelas="XI RPL" device_id="M2304QGC" foto_url="https://i.scdn.co/image/ab67616100005174670c3c362b6b4e622e04fdc4" />
-              <UserRow nisn="0011223344" name="James Garcia" email="james.garcia@example.com" phone="+1555951753" kelas="XI RPL" device_id="2106119AG" foto_url="https://i.scdn.co/image/ab6761610000517444c1e1613516d7cf8226375f" />
-              <UserRow nisn="0044332211" name="William Rodriguez" email="william.rodriguez@example.com" phone="+1555357159" kelas="XI RPL" device_id="2106119MG" foto_url="https://bookingagentinfo.com/wp-content/uploads/2023/12/ab6761610000e5ebcd9e2b8f901285164a7fde6c.jpg" />
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-500">
+                    <Loader2 className="w-5 h-5 animate-spin inline-block mr-2" />
+                    Loading...
+                  </td>
+                </tr>
+              ) : teachers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-zinc-500">
+                    Tidak ada data guru ditemukan.
+                  </td>
+                </tr>
+              ) : (
+                teachers.map((t) => (
+                  <tr key={t.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors group">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-zinc-600 dark:text-zinc-400">{t.nip || "-"}</td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap font-medium text-zinc-900 dark:text-zinc-50">{t.name}</td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-zinc-600 dark:text-zinc-400">{t.email || "-"}</td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-zinc-600 dark:text-zinc-400">{t.phone || "-"}</td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-zinc-600 dark:text-zinc-400">
+                      {t.subject ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                          {t.subject}
+                        </span>
+                      ) : "-"}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
+                      <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => openEditModal(t)}
+                          className="flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 px-2 py-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(t.id)}
+                          disabled={deletingId === t.id}
+                          className="flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-700 dark:hover:text-red-400 px-2 py-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                        >
+                          {deletingId === t.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Pagination */}
         <div className="px-4 sm:px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-zinc-500 dark:text-zinc-400">
-          <div>Showing 1 to 10 of 15 results</div>
+          <div>Showing {showingFrom} to {showingTo} of {totalCount} results</div>
           <div className="flex items-center gap-1">
-            <button className="px-3 py-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors">Previous</button>
-            <button className="w-8 h-8 rounded-full bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 flex items-center justify-center font-medium">1</button>
-            <button className="w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-900 flex items-center justify-center transition-colors">2</button>
-            <button className="px-3 py-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors text-zinc-900 dark:text-zinc-50 font-medium">Next</button>
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3 py-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors disabled:opacity-40"
+            >
+              Previous
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+              .reduce<(number | "...")[]>((acc, p, i, arr) => {
+                if (i > 0 && p - (arr[i - 1]) > 1) acc.push("...")
+                acc.push(p)
+                return acc
+              }, [])
+              .map((p, i) =>
+                p === "..." ? (
+                  <span key={`ellipsis-${i}`} className="px-1">...</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                      page === p
+                        ? "bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 font-medium"
+                        : "hover:bg-zinc-100 dark:hover:bg-zinc-900"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-3 py-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors text-zinc-900 dark:text-zinc-50 font-medium disabled:opacity-40 disabled:font-normal"
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>
-    </div>
-  )
-}
 
-function StatCard({ icon: Icon, label, value, type = "default" }: { icon: any, label: string, value: string, type?: "default" | "toggle" | "check" }) {
-  return (
-    <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between min-h-[140px]">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800">
-            <Icon className="w-4 h-4" />
+      {/* Create/Edit Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
+                {editingTeacher ? "Edit Guru" : "Tambah Guru"}
+              </h2>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
+                {formError}
+              </div>
+            )}
+
+            <form onSubmit={handleFormSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Nama Lengkap</label>
+                <input
+                  type="text"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  required
+                  placeholder="Nama guru"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-shadow"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-zinc-900 dark:text-zinc-50">NIP</label>
+                <input
+                  type="text"
+                  value={formNip}
+                  onChange={(e) => setFormNip(e.target.value)}
+                  placeholder="Nomor Induk Pegawai"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-shadow"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Email</label>
+                <input
+                  type="email"
+                  value={formEmail}
+                  onChange={(e) => setFormEmail(e.target.value)}
+                  placeholder="guru@email.com"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-shadow"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-zinc-900 dark:text-zinc-50">No. HP</label>
+                <input
+                  type="text"
+                  value={formPhone}
+                  onChange={(e) => setFormPhone(e.target.value)}
+                  placeholder="+6281234567890"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-shadow"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Mata Pelajaran</label>
+                <input
+                  type="text"
+                  value={formSubject}
+                  onChange={(e) => setFormSubject(e.target.value)}
+                  placeholder="Contoh: Matematika"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-shadow"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={formLoading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-900 text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50"
+                >
+                  {formLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {editingTeacher ? "Simpan" : "Tambah"}
+                </button>
+              </div>
+            </form>
           </div>
-          <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{label}</span>
         </div>
-        <GripHorizontal className="w-4 h-4 text-zinc-300 dark:text-zinc-700" />
-      </div>
-      <div className="flex items-end justify-between relative z-10">
-        <div className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">{value}</div>
-        {type === "toggle" && (
-          <ToggleLeft className="w-8 h-8 text-zinc-200 dark:text-zinc-800" strokeWidth={1.5} />
-        )}
-      </div>
-      {type === "default" && (
-        <Icon className="absolute -bottom-4 -right-4 w-24 h-24 text-zinc-50 dark:text-zinc-900/50 opacity-50 z-0" strokeWidth={1} />
       )}
-      {type === "check" && (
-        <svg className="absolute -bottom-4 -right-4 w-24 h-24 text-zinc-50 dark:text-zinc-900/50 opacity-50 z-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      )}
     </div>
   )
 }
 
-function FilterInput({ label, placeholder, type = "text" }: { label: string, placeholder: string, type?: string }) {
+function StatCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
-    <div className="space-y-1.5">
-      <label className="text-sm font-medium text-zinc-900 dark:text-zinc-50">{label}</label>
-      <div className="relative">
-        {type === "date" && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 dark:text-zinc-400">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-        )}
-        <input 
-          type={type} 
-          placeholder={placeholder}
-          className={`w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-500 dark:placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 transition-shadow ${type === 'date' ? 'pl-9' : ''}`}
-        />
+    <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 relative overflow-hidden flex flex-col justify-between min-h-[120px]">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-800">
+          <Icon className="w-4 h-4" />
+        </div>
+        <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{label}</span>
       </div>
+      <div className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">{value}</div>
+      <Icon className="absolute -bottom-4 -right-4 w-24 h-24 text-zinc-50 dark:text-zinc-900/50 opacity-50 z-0" strokeWidth={1} />
     </div>
-  )
-}
-
-function UserRow({ nisn, name, email, phone, kelas, device_id, foto_url }: { nisn: string, name: string, email: string, phone: string, kelas: string, device_id: string, foto_url: string }) {
-  
-  return (
-    <tr className="hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors group">
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-zinc-600 dark:text-zinc-400">{nisn}</td>
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden shrink-0 border border-zinc-200 dark:border-zinc-700">
-            <Image
-              src={foto_url || "https://placehold.co/400"}
-              alt={name}
-              width={40}
-              height={40}
-              className="w-full h-full object-cover"
-            />
-          </div>
-          <span className="font-medium text-zinc-900 dark:text-zinc-50">{name}</span>
-        </div>
-      </td>
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-zinc-600 dark:text-zinc-400">{email}</td>
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-zinc-600 dark:text-zinc-400">{phone}</td>
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-zinc-600 dark:text-zinc-400">{kelas}</td>
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-zinc-600 dark:text-zinc-400">{device_id}</td>
-      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
-        <div className="flex items-center justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-          <button className="flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 px-2 py-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-            <Eye className="w-3.5 h-3.5" />
-            View
-          </button>
-          <button className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-            <MoreVertical className="w-4 h-4" />
-          </button>
-        </div>
-      </td>
-    </tr>
   )
 }

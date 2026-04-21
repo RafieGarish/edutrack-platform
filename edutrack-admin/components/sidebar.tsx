@@ -59,7 +59,7 @@ const navItems: { section: string; links: NavLink[] }[] = [
   {
     section: "SETTINGS",
     links: [
-      { label: "Users", href: "/dashboard/users", icon: Users },
+      // { label: "Users", href: "/dashboard/users", icon: Users },
       { label: "Settings", href: "/dashboard/settings", icon: Settings },
     ],
   },
