@@ -40,27 +40,27 @@ const navItems: { section: string; links: NavLink[] }[] = [
   {
     section: "MAIN",
     links: [
-      { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
-      { label: "Attendance", href: "/dashboard/attendance", icon: ClipboardCheck },
-      { label: "Students", href: "/dashboard/students", icon: GraduationCap, hasChildren: true },
-      { label: "Teachers", href: "/dashboard/teachers", icon: BookOpen, hasChildren: true },
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Kehadiran", href: "/dashboard/attendance", icon: ClipboardCheck },
+      { label: "Siswa", href: "/dashboard/students", icon: GraduationCap, hasChildren: true },
+      { label: "Guru", href: "/dashboard/teachers", icon: BookOpen, hasChildren: true },
       // { label: "Classes", href: "/dashboard/classes", icon: CalendarDays },
     ],
   },
   {
     section: "MANAGEMENT",
     links: [
-      { label: "Schedules", href: "/dashboard/schedules", icon: CalendarDays },
-      { label: "Permissions", href: "/dashboard/permissions", icon: FileText },
-      { label: "Scanners", href: "http://localhost:3001", icon: ScanLine, target: "_blank" },
-      { label: "Notifications", href: "/dashboard/notifications", icon: Bell },
+      { label: "Jadwal", href: "/dashboard/schedules", icon: CalendarDays },
+      { label: "Kelola Izin", href: "/dashboard/permissions", icon: FileText },
+      { label: "Kelola Scanner", href: "https://edutrack-scanner.vercel.app", icon: ScanLine, target: "_blank" },
+      { label: "Notifikasi (Coming Soon)", href: "/dashboard/notifications", icon: Bell },
     ],
   },
   {
     section: "SETTINGS",
     links: [
       // { label: "Users", href: "/dashboard/users", icon: Users },
-      { label: "Settings", href: "/dashboard/settings", icon: Settings },
+      { label: "Pengaturan", href: "/dashboard/settings", icon: Settings },
     ],
   },
 ];

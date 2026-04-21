@@ -56,7 +56,7 @@ const projects = [
   },
 ];
 
-export function RecentProjects() {
+export function AbsensiTerkini() {
   const [page, setPage] = useState(1);
   const totalPages = 3;
 

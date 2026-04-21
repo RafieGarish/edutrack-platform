@@ -6,25 +6,25 @@ import { cn } from "@/lib/utils";
 const stats = [
   {
     label: "Absensi Hari Ini",
-    value: "24",
+    value: "92",
     change: "+3",
     positive: true,
-    icon: FolderOpen,
+    icon: Users,
     color: "text-blue-400",
     bg: "bg-blue-400/10",
   },
   {
     label: "Hadir",
-    value: "1,847",
-    change: "+12%",
+    value: "89",
+    change: "+2%",
     positive: true,
-    icon: Users,
+    icon: CheckSquare,
     color: "text-primary",
     bg: "bg-primary/10",
   },
   {
     label: "Sakit",
-    value: "78%",
+    value: "2",
     change: "+5%",
     positive: true,
     icon: CheckSquare,
@@ -33,10 +33,10 @@ const stats = [
   },
   {
     label: "Izin",
-    value: "32 min",
-    change: "0%",
+    value: "1",
+    change: "-1%",
     positive: null,
-    icon: Clock,
+    icon: CheckSquare,
     color: "text-amber-400",
     bg: "bg-amber-400/10",
   },
@@ -81,8 +81,8 @@ export function StatsCards() {
                   stat.positive === true
                     ? "text-primary"
                     : stat.positive === false
-                    ? "text-destructive"
-                    : "text-muted-foreground"
+                      ? "text-destructive"
+                      : "text-muted-foreground"
                 )}
               >
                 {stat.change}

@@ -2,7 +2,7 @@ import { GreetingCard } from "@/components/greeting-card";
 import { StatsCards } from "@/components/stats-cards";
 import { QuickTasks } from "@/components/quick-tasks";
 import { CalendarWidget } from "@/components/calendar-widget";
-import { RecentProjects } from "@/components/recent-projects";
+import { AbsensiTerkini } from "@/components/absensi-terkini";
 import { ActivityMap } from "@/components/activity-map";
 import { Insights } from "@/components/insights";
 import { RevenueAnalytics } from "@/components/revenue-analytics";
@@ -37,7 +37,7 @@ export default async function DashboardPage() {
 
             {/* Recent Projects */}
             <div className="animate-stagger animate-fade-in-up delay-300">
-              <RecentProjects />
+              <AbsensiTerkini />
             </div>
 
             {/* Tasks + Calendar side by side */}
@@ -56,7 +56,7 @@ export default async function DashboardPage() {
           <div className="xl:w-72 shrink-0 space-y-5">
             <div className="animate-stagger animate-slide-in-right delay-200">
               {/* <Insights /> */}
-              <ChartPieDonutText/>
+              <ChartPieDonutText />
             </div>
             <div className="animate-stagger animate-slide-in-right delay-300">
               <RevenueAnalytics />
